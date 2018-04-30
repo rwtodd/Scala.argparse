@@ -1,4 +1,4 @@
-package com.darktalents.argparse
+package org.rwtodd.argparse
 
 import scala.collection.mutable.ArrayBuffer
 
