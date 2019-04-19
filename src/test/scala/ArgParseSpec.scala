@@ -7,7 +7,7 @@ class ArgParseSpec extends Spec {
   object `An Args Instance` {
      def `should run a does func` = {
        var g = 0
-       val as = new Args(new FlagArg("-g","increment g").does { _ => g += 1 })
+       val as = new Args(new FlagArg("-g","increment g").does { () => g += 1 })
        val extra = as.parse(Array("-g","-g"))
        assert(extra.isEmpty)
        assert(g == 2) 

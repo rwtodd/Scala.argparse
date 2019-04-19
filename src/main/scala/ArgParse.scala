@@ -2,10 +2,13 @@ package org.rwtodd.argparse
 
 import scala.collection.mutable.ArrayBuffer
 
-/** A base class for cmdline switches. */
-abstract class Switch[T](val name: String, val help: String) {
-  val needsArg = true 
+abstract class Switch(val name: String, val help: String, val needsArg: Boolean) {
+  def accept(a: Args, v: String) : Unit
+  def applyDefault() = {}
+}
 
+/** A base class for cmdline switches. */
+abstract class TypedSwitch[T](name: String, help: String) extends Switch(name, help, true) {
   protected var seen = false
   protected var action: (T) => Unit = null
   protected var options: Seq[T] = null
@@ -28,7 +31,7 @@ abstract class Switch[T](val name: String, val help: String) {
 
   def parse(v: String): T
 
-  def accept(v: String) : Unit = {
+  override def accept(a: Args, v: String) : Unit = {
      seen = true
      val current = parse(v)
      if((options == null) || (options.contains(current))) {
@@ -38,7 +41,7 @@ abstract class Switch[T](val name: String, val help: String) {
      }
   }
 
-  def applyDefault() : Unit = 
+  override def applyDefault() : Unit =
     if(!seen) {
       default match {
          case Some(t) => action(t)
@@ -47,45 +50,74 @@ abstract class Switch[T](val name: String, val help: String) {
     }
 }
 
-/** A class for switches that take integers */ 
-class IntArg(name: String, help: String) extends Switch[Int](name,help) {
-  override def parse(v: String) : Int = try { 
+/** A class for switches that take integers */
+class IntArg(name: String, help: String) extends TypedSwitch[Int](name,help) {
+  override def parse(v: String) : Int = try {
      v.toInt
   } catch {
-     case e: Exception => 
+     case e: Exception =>
         throw new IllegalArgumentException(s"Switch <${name}> expected an integer instead of <${v}>.", e)
   }
 }
 
-/** A class for switches that take doubles */ 
-class DoubleArg(name: String, help: String) extends Switch[Double](name,help) {
+/** A class for switches that take doubles */
+class DoubleArg(name: String, help: String) extends TypedSwitch[Double](name,help) {
   override def parse(v: String) : Double = try {
      v.toDouble
   } catch {
-     case e: Exception => 
+     case e: Exception =>
         throw new IllegalArgumentException(s"Switch <${name}> expected a number instead of <${v}>.", e)
   }
 }
 
-/** A class for switches that take strings */ 
-class StrArg(name: String, help: String) extends Switch[String](name,help) {
-  override def parse(v: String) : String = v 
+/** A class for switches that take strings */
+class StrArg(name: String, help: String) extends TypedSwitch[String](name,help) {
+  override def parse(v: String) : String = v
 }
 
-/** A class for switches that are no-arg flags */ 
-class FlagArg(name: String, help: String) extends Switch[Boolean](name,help) {
-  override val needsArg = false 
-  override def parse(v: String) : Boolean = true
+/** A class for switches that are no-arg flags */
+class FlagArg(name: String, help: String) extends Switch(name,help,false) {
+  protected var action : () => Unit = null
+
+  override def accept(a: Args, v: String) : Unit = {
+    if (action != null) action()
+  }
+
+  def does(what: () => Unit) = {
+     action = what
+     this
+  }
+}
+
+class HelpArg(name: String) extends Switch(name, "displays this help text", false) {
+  protected var preText: String = ""
+  protected var postText: String = ""
+
+  def saysFirst(sf: String) = {
+    preText = sf
+    this
+  }
+
+  def saysLast(sl: String) = {
+    postText = sl
+    this
+  }
+
+  override def accept(a: Args, v: String): Unit = {
+    System.err.println(preText)
+    a.showOptions(System.err)
+    System.err.println(postText)
+  }
 }
 
 
 /** Args is the class that actually parses a set of arguments */
-class Args(val switches: Switch[_]*) {
+class Args(val switches: Switch*) {
   def parse(args: IndexedSeq[String]) : ArrayBuffer[String] = {
       val extras = ArrayBuffer[String]()
       var idx = 0
       val alen = args.length
-      while (idx < alen) { 
+      while (idx < alen) {
           val hd = args(idx)
           idx += 1
           switches.find(sw => sw.name == hd) match {
@@ -94,41 +126,37 @@ class Args(val switches: Switch[_]*) {
                                      throw new IllegalArgumentException(
                                         s"The switch <${sw.name}> expects an argument!")
                                  }
-                                 sw.accept(args(idx)) 
+                                 sw.accept(this, args(idx))
                                  idx += 1
-                             } else { 
-                                 sw.accept("") 
+                             } else {
+                                 sw.accept(this, "")
                              }
             case None     => extras += hd
           }
       }
-      for (sw <- switches) sw.applyDefault() 
-      extras 
-  }  
-
-  /** Tuples of (name, desc) with the argument-name from the front of the 
-   *  help string pulled into the name portion, and the rest put into the
-   *  desc portion.  */
-  private lazy val helpStrings = switches map { sw =>
-     val h = sw.help
-     if (h.startsWith("<")) {
-       val (argname, helpstr) = h.splitAt(h.indexOf('>')+1)
-       ( s"${sw.name} ${argname}", helpstr.trim ) 
-     } else (sw.name, h)
+      for (sw <- switches) sw.applyDefault()
+      extras
   }
 
   /** generates a helpful listing of the available arguments.
    *  Users should subclass this to elaborate on what it says, calling
    *  the super function when it's time to show the arguments. */
-  def showHelp() : Unit = {
-     println("OPTIONS")
+  def showOptions(wtr: java.io.PrintStream) : Unit = {
+     val helpStrings = switches map { sw =>
+        val h = sw.help
+        if (h.startsWith("<")) {
+          val (argname, helpstr) = h.splitAt(h.indexOf('>')+1)
+          ( s"${sw.name} ${argname}", helpstr.trim )
+        } else (sw.name, h)
+     }
+     wtr.println("OPTIONS")
      for { (nm ,desc) <- helpStrings } {
-        if (nm.length <= 5)  println(f"  $nm%-5s  $desc%s")
+        if (nm.length <= 5)  wtr.println(f"  $nm%-5s  $desc%s")
         else {
-           println(s"  $nm")
-           println(s"         $desc")
+           wtr.println(s"  $nm")
+           wtr.println(s"         $desc")
         }
-        println() 
+        wtr.println()
      }
   }
 }

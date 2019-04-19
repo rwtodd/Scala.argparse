@@ -18,11 +18,11 @@ def main(inargs: Array[String]) = {
 
   val args: Args = new Args(
      new FlagArg("-v","increases verbosity")
-           .does { _ => verbosity += 1 },
+           .does { () => verbosity += 1 },
      new IntArg("-l", "<level> sets the starting level (1-3)")
            .defaultsTo(1).choices(1 to 3).does { level = _ },
-     new FlagArg("-help", "shows this help message")
-           .does { _ => args.showHelp() }
+     new HelpArg("-help")
+           .saysFirst("Here is the help text. Below are the defined options:\n")
   )
 
   val extraArgs = args.parse(inargs)
@@ -31,6 +31,8 @@ def main(inargs: Array[String]) = {
 ... and the help text describes the arguments formatted roughly like man-pages:
 
 ```
+Here is the help text. Below are the defined options:
+
 OPTIONS
    -v     increases verbosity
 
@@ -38,20 +40,5 @@ OPTIONS
           sets the starting level (1-3)
 
    -help  shows this help message          
-```
-
-To put prolog or epilog text on the help, just turn the Args construction into an
-anonymous class and override it:
-
-```scala
-lazy val args: Args = new Args(
-             ...flags go here...
-         ) {
-   override def showHelp() = {
-      println("stuff")
-      super.showHelp()
-      println("more stuff")
-   }
-}
 ```
 
