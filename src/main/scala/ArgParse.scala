@@ -1,5 +1,6 @@
 package org.rwtodd.argparse
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable.ArrayBuffer
 
 abstract class Switch(val name: String, val help: String, val needsArg: Boolean) {
@@ -113,7 +114,7 @@ class HelpArg(name: String) extends Switch(name, "displays this help text", fals
 
 /** Args is the class that actually parses a set of arguments */
 class Args(val switches: Switch*) {
-  def parse(args: IndexedSeq[String]) : ArrayBuffer[String] = {
+  def parse(args: IndexedSeq[String]): ArrayBuffer[String] = {
       val extras = ArrayBuffer[String]()
       var idx = 0
       val alen = args.length
@@ -137,6 +138,7 @@ class Args(val switches: Switch*) {
       for (sw <- switches) sw.applyDefault()
       extras
   }
+  def parse(args: Array[String]): ArrayBuffer[String] = parse(ArraySeq.unsafeWrapArray(args))
 
   /** generates a helpful listing of the available arguments.
    *  Users should subclass this to elaborate on what it says, calling
