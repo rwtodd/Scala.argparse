@@ -16,7 +16,7 @@ by going with this library.
   :help [\h "Prints this help"]
   :times [\t "Number of times (0-5)" { :arg "NUM" :default 5
                                        :parser #(Integer/parseInt %)
-									   :validator #(<= 0 % 5) }]
+                                       :validator #(<= 0 % 5) }]
   :verbose [\v "Verbosity level" { :default 0 :update-fn inc }]})
 
 ...
