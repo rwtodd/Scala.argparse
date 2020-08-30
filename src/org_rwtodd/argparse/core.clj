@@ -55,16 +55,80 @@
 (defn parse
   "Parse `args` according to `spec`"
   [spec args]
-  (let [short-args (into {}
-                         (comp (map (fn [[ln sp]] [(first sp) ln]))
-                               (filter first))
-                         spec)
-        defaults   (into {}
-                         (comp (map (fn [[ln sp]] [ln (:default (get sp 2))]))
-                               (filter second))
-                         spec)]
-    (let [[parsable unparsed] (split-with (partial not= "--") args)]
-      (concat
-       (mapcat (partial expand-arg spec short-args) parsable)
-       (drop 1 unparsed)))))
+  (let [yes (constantly true)]
+    ;; loop over the arguments, accumulating settings
+    (loop [settings  (into {:free-args []}
+                           (comp (map (fn [[ln sp]] [ln (:default (get sp 2))]))
+                                 (filter second))
+                           spec)
+           ;; any args prior to "--" are expanded to their long form
+           args      (let [[parsable unparsed] (split-with (partial not= "--") args)
+                           short-args          (into {}
+                                                     (comp (map (fn [[ln sp]] [(first sp) ln]))
+                                                           (filter first))
+                                                     spec)]
+                       (concat
+                        (mapcat (partial expand-arg spec short-args) parsable)
+                        (drop 1 unparsed)))]
+      (let [[a1 a2] args]
+        (cond
+          ;; are we done?
+          (nil? a1) settings
 
+          ;; do we have a switch?
+          (keyword? a1)
+          (let [entry (get spec a1)
+                parms (get entry 2)]
+            (when (nil? entry)
+              (throw (IllegalArgumentException. (str "Unrecognized argument: " a1))))
+            (if (:arg parms)
+              ;; ok, a2 should be an argument, which should be a string
+              (do
+                (when (not (string? a2))
+                  (throw (IllegalArgumentException. (str "No Argument given for " a1))))
+                (let [parsed (try ((or (:parser parms) identity) a2)
+                                  (catch Exception e (throw (IllegalArgumentException.
+                                                             (str "Could not parse <" a2
+                                                                  "> as an arg for switch " a1)))))
+                      valid? ((or (:validator parms) yes) parsed)]
+                  (when (not valid?)
+                    (throw (IllegalArgumentException. (str "Value <" a2 "> is an invalid setting for " a1))))
+                  (recur (if-let [uf (:update-fn parms)]
+                           (update settings a1 (partial uf parsed))
+                           (assoc settings a1 parsed))
+                         (drop 2 args))))
+              ;; this parameter takes no arguments...
+              (recur (update settings a1 (or (:update-fn parms) yes))
+                     (rest args))))
+
+          ;; if the next arg is a character, it wasn't found as a short option. complain!
+          (char? a1)
+          (throw (IllegalArgumentException. (str "Unknown short option -" a1)))
+
+          ;; if the next arg is a string, just collect it...
+          (string? a1)
+          (recur (update settings :free-args conj a1)
+                 (rest args)))))))
+
+(defn help-text
+  "Generate help text for the arguments in `spec`"
+  [spec]
+  (let [^StringBuilder sb (StringBuilder.)
+        ^StringBuilder line1 (StringBuilder.)]
+    (doseq [switch (sort (keys spec))]
+      (let [entry (get spec switch)
+            short (get entry 0)
+            desc  (get entry 1)
+            argnm (get (get entry 2) :arg)]
+        (.setLength line1 0)
+        (.append line1 "--") (.append line1 (.substring (str switch) 1))
+        (when short (.append line1 "|-") (.append line1 short))
+        (when argnm (.append line1 "  ") (.append line1 argnm))
+        (.append sb (.toString line1))
+        (let [remaining (- 15 (.length line1))]
+          (if (neg? remaining)
+            (.append sb "\n               ")
+            (.append sb (apply str (repeat remaining \space))))
+          (.append sb desc)
+          (.append sb \newline))))
+    (.toString sb)))
