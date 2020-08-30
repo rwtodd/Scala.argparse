@@ -1,44 +1,37 @@
-# argparse
+# org-rwtodd.argparse.core
 
-This is just a simple scala library for parsing command-line args.  
-I think giving each flag a `does` argument with closures avoids 
-a lot of cruft I see in other libs (where you have to then ask 
-the parser if it got the arguments, and what they were, etc).  
+This is just a simple clojure library for parsing command-line args.
 
-At the bottom of the following snippet, 
-the vars `verbosity` and `level` are set 
-and ready to use.
+It's very similar to `tools.cli`, but more minimal (120 lines or so,
+and no regexes needed for parsing).  It does still understand many
+syntaxes, like multiple short options concatenated (`-tvf`) and using
+equals with long options (`--file=toaster.txt`).  It also stops
+looking for switches after a `--` argument.  So you don't give up much
+by going with this library.
 
 ## Example
 
-```scala
-def main(inargs: Array[String]) = {
-  var verbosity = 0
-  var level = 0
+```clojure
+(def arg-spec {
+  :help [\h "Prints this help"]
+  :times [\t "Number of times (0-5)" { :arg "NUM" :default 5
+                                       :parser #(Integer/parseInt %)
+									   :validator #(<= 0 % 5) }]
+  :verbose [\v "Verbosity level" { :default 0 :update-fn inc }]})
 
-  val args: Args = new Args(
-     new FlagArg("-v","increases verbosity")
-           .does { () => verbosity += 1 },
-     new IntArg("-l", "<level> sets the starting level (1-3)")
-           .defaultsTo(1).choices(1 to 3).does { level = _ },
-     new HelpArg("-help")
-           .saysFirst("Here is the help text. Below are the defined options:\n")
-  )
+...
+(let [options (ap/parse arg-spec args)] ...)
 
-  val extraArgs = args.parse(inargs)
+...
+(println "Options:\n" (ap/help-text arg-spec))
 ```
 
-... and the help text describes the arguments formatted roughly like man-pages:
+## Tips
 
-```
-Here is the help text. Below are the defined options:
-
-OPTIONS
-   -v     increases verbosity
-
-   -l <level>
-          sets the starting level (1-3)
-
-   -help  shows this help message          
-```
+- Use `nil` for the short option character if you don't want a short
+  version.  You always have to have a long version.
+- `parse` throws `IllegalArgumentException`s when it finds input it doesn't
+  like.
+- Any args which don't look like switches are returned with key
+  `:free-args` in the order they were found.
 

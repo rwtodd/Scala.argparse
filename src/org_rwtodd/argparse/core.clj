@@ -1,11 +1,13 @@
 (ns org-rwtodd.argparse.core)
 
-(def example-spec
-  {
-   :times   [\t "Number of times" { :arg "N" :default 5 :parser #(Integer/parseInt %) } ]
-   :verbose [\v "Verbosity Level" { :default 0 :update-fn inc } ]
-   :help    [\? "Get Help" ]
-   })
+;;(def example-spec
+;;  {
+;;   :times   [\t "Number of times (0-5)" { :arg "NUM" :default 5
+;;                                         :parser #(Integer/parseInt %)
+;;                                         :validator #(<= 0 % 5) } ]
+;;   :verbose [\v "Verbosity Level" { :default 0 :update-fn inc } ]
+;;   :help    [\? "Get Help" ]
+;;   })
 
 (defn- switch-has-args?
   [spec sw]
@@ -113,22 +115,16 @@
 (defn help-text
   "Generate help text for the arguments in `spec`"
   [spec]
-  (let [^StringBuilder sb (StringBuilder.)
-        ^StringBuilder line1 (StringBuilder.)]
+  (let [^StringBuilder sb (StringBuilder.)]
     (doseq [switch (sort (keys spec))]
       (let [entry (get spec switch)
             short (get entry 0)
             desc  (get entry 1)
             argnm (get (get entry 2) :arg)]
-        (.setLength line1 0)
-        (.append line1 "--") (.append line1 (.substring (str switch) 1))
-        (when short (.append line1 "|-") (.append line1 short))
-        (when argnm (.append line1 "  ") (.append line1 argnm))
-        (.append sb (.toString line1))
-        (let [remaining (- 15 (.length line1))]
-          (if (neg? remaining)
-            (.append sb "\n               ")
-            (.append sb (apply str (repeat remaining \space))))
-          (.append sb desc)
-          (.append sb \newline))))
+        (.append sb "--") (.append sb (.substring (str switch) 1))
+        (when short (.append sb "|-") (.append sb short))
+        (when argnm (.append sb "  ") (.append sb argnm))
+        (.append sb "\n    ")
+        (.append sb desc)
+        (.append sb \newline)))
     (.toString sb)))
