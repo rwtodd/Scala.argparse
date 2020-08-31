@@ -36,8 +36,8 @@
             (list kw kwarg)
             (throw (IllegalArgumentException. (str arg " does not take args!")))))))
 
-    ;; parse -abc short switches
-    (.startsWith arg "-")
+    ;; parse -abc short switches, as long as it isn't just '-' by itself
+    (and (.startsWith arg "-") (> (.length arg) 1))
     (let [no-args  (map #(get shspec % %)
                         (take-while (fn [x] (not (short-has-args? shspec spec x)))
                                     (.substring arg 1)))
