@@ -2,24 +2,48 @@
 
 ;;(def example-spec
 ;;  {
-;;   :times   [\t "Number of times (0-5)" { :arg "NUM" :default 5
-;;                                         :parser #(Integer/parseInt %)
-;;                                         :validator #(<= 0 % 5) } ]
-;;   :verbose [\v "Verbosity Level" { :default 0 :update-fn inc } ]
-;;   :help    [\? "Get Help" ]
+;;   :times   (int-param "NUM" "Number of times (0-5)"
+;;                :default 5    :validator #(<= 0 % 5))
+;;   :verbose (counter-param "Verbosity Level" :short \v)
+;;   :help    (flag-param "Get Help" :short \?)
 ;;   })
+;;
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;; Keys:
+;;   :doc STRING -- the documentation for the parameter
+;;   :short CHAR -- the character for the short-version of the parameter
+;;   :arg STRING -- the name of the argument (also this is what tells the parser to expect an argument)
+;;         :default -- the default value of the param, prior to parsing the cmdline 
+;;         :parser  -- the function to parse the argument
+;;         :validator -- a predicate to validate the parsed argument
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(defn- switch-has-args?
-  [spec sw]
-  (if-let [switch-spec (get (sw spec) 2)]
-    (:arg switch-spec)
-    false))
+;; predefined param helpers ~~~~~
+(defn flag-param
+  "Defines a flag parameter, which is set to `true` when given."
+  [doc & keys]
+  (merge { :doc doc } (apply hash-map keys)))
+   
+(defn int-param
+  "Defines an integer parameter taking arg ARG with documentation DOC"
+  [arg doc & keys]
+  (merge { :doc doc, :arg arg, :parser #(Integer/parseInt %) } (apply hash-map keys)))
+
+(defn counter-param
+  "Defines a parameter that counts how many times it is found in the cmdline args."
+  [doc & keys]
+  (merge { :doc doc, :default 0, :update-fn inc } (apply hash-map keys)))
+;; END predefined param helpers ~~~~~
+
+(defn- param-has-args?
+  "look up :arg for param P in the parameter spec SPEC. If the key is there, it takes args."
+  [spec p]
+  (:arg (get spec p)))
 
 (defn- short-has-args?
+  "determine if a param given by short name CHAR takes args"
   [sspec spec char]
-  (if-let [sw (get sspec char)]
-    (switch-has-args? spec sw)
-    false))
+  (param-has-args? spec (get sspec char)))
 
 (defn- expand-arg
   "Expand an argument into potentially multiple arguments"
@@ -32,7 +56,7 @@
         (list (keyword (.substring arg 2)))
         (let [kw    (keyword (.substring arg 2 eqidx))
               kwarg (.substring arg (inc eqidx))]
-          (if (switch-has-args? spec kw)
+          (if (param-has-args? spec kw)
             (list kw kwarg)
             (throw (IllegalArgumentException. (str arg " does not take args!")))))))
 
@@ -60,13 +84,13 @@
   (let [yes (constantly true)]
     ;; loop over the arguments, accumulating settings
     (loop [settings  (into {:free-args []}
-                           (comp (map (fn [[ln sp]] [ln (:default (get sp 2))]))
+                           (comp (map (fn [[long-name param]] [long-name (:default param)]))
                                  (filter second))
                            spec)
            ;; any args prior to "--" are expanded to their long form
            args      (let [[parsable unparsed] (split-with (partial not= "--") args)
                            short-args          (into {}
-                                                     (comp (map (fn [[ln sp]] [(first sp) ln]))
+                                                     (comp (map (fn [[long-name param]] [(:short param) long-name]))
                                                            (filter first))
                                                      spec)]
                        (concat
@@ -79,28 +103,27 @@
 
           ;; do we have a switch?
           (keyword? a1)
-          (let [entry (get spec a1)
-                parms (get entry 2)]
-            (when (nil? entry)
+          (let [param (get spec a1)]
+            (when-not param
               (throw (IllegalArgumentException. (str "Unrecognized argument: " a1))))
-            (if (:arg parms)
+            (if (:arg param)
               ;; ok, a2 should be an argument, which should be a string
               (do
                 (when (not (string? a2))
                   (throw (IllegalArgumentException. (str "No Argument given for " a1))))
-                (let [parsed (try ((or (:parser parms) identity) a2)
+                (let [parsed (try ((or (:parser param) identity) a2)
                                   (catch Exception e (throw (IllegalArgumentException.
                                                              (str "Could not parse <" a2
                                                                   "> as an arg for switch " a1)))))
-                      valid? ((or (:validator parms) yes) parsed)]
-                  (when (not valid?)
+                      valid? ((or (:validator param) yes) parsed)]
+                  (when-not valid?
                     (throw (IllegalArgumentException. (str "Value <" a2 "> is an invalid setting for " a1))))
-                  (recur (if-let [uf (:update-fn parms)]
+                  (recur (if-let [uf (:update-fn param)]
                            (update settings a1 (partial uf parsed))
                            (assoc settings a1 parsed))
                          (drop 2 args))))
               ;; this parameter takes no arguments...
-              (recur (update settings a1 (or (:update-fn parms) yes))
+              (recur (update settings a1 (or (:update-fn param) yes))
                      (rest args))))
 
           ;; if the next arg is a character, it wasn't found as a short option. complain!
@@ -116,15 +139,12 @@
   "Generate help text for the arguments in `spec`"
   [spec]
   (let [^StringBuilder sb (StringBuilder.)]
-    (doseq [switch (sort (keys spec))]
-      (let [entry (get spec switch)
-            short (get entry 0)
-            desc  (get entry 1)
-            argnm (get (get entry 2) :arg)]
-        (.append sb "--") (.append sb (.substring (str switch) 1))
+    (doseq [param (sort (keys spec))]
+      (let [{:keys [short doc arg]} (get spec param)]
+        (.append sb "--") (.append sb (.substring (str param) 1))
         (when short (.append sb "|-") (.append sb short))
-        (when argnm (.append sb "  ") (.append sb argnm))
+        (when arg   (.append sb "  ") (.append sb arg))
         (.append sb "\n    ")
-        (.append sb desc)
+        (.append sb doc)
         (.append sb \newline)))
     (.toString sb)))

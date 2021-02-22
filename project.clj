@@ -3,5 +3,5 @@
   :url "https://github.com/rwtodd/org-rwtodd.argparse"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[org.clojure/clojure "1.10.1"]]
+  :dependencies [[org.clojure/clojure "1.10.2"]]
   :repl-options {:init-ns org-rwtodd.argparse.core})
