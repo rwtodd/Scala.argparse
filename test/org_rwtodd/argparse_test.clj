@@ -1,7 +1,6 @@
-(ns org-rwtodd.argparse.core-test
+(ns org-rwtodd.argparse-test
   (:require [clojure.test :refer :all]
-            [org-rwtodd.argparse.core :as arg]))
-
+            [org-rwtodd.argparse :as arg]))
 
 (deftest test-counter
   (testing "Counting args"

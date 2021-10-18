@@ -1,4 +1,4 @@
-(ns org-rwtodd.argparse.core)
+(ns org-rwtodd.argparse)
 
 ;;(def example-spec
 ;;  {
