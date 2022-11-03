@@ -1,4 +1,7 @@
 target
 project/build.properties
 .cpcache/
+.clj-kondo/
+.lsp/
+.calva/
 *~

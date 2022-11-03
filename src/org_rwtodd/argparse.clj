@@ -16,6 +16,7 @@
 ;;         :default -- the default value of the param, prior to parsing the cmdline 
 ;;         :parser  -- the function to parse the argument
 ;;         :validator -- a predicate to validate the parsed argument
+;;         :update-fn -- the function to use to fuse an argument with whatever we already had
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ;; predefined param helpers ~~~~~

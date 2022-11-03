@@ -20,3 +20,9 @@
     (testing "the -- flag"
       (is (nil? (:count (arg/parse spec ["--" "--count=21"]))))
       (is (= ["--count=21"] (:free-args (arg/parse spec ["--" "--count=21"])))))))
+
+((deftest flag-test
+   (let [spec { :verbose (arg/flag-param "toggle verbose mode")}] 
+      (testing "a flag param"
+        (is (:verbose (arg/parse spec ["--verbose"])))))))
+     

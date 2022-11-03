@@ -13,11 +13,11 @@ by going with this library.
 
 ```clojure
 (def arg-spec {
-  :help [\h "Prints this help"]
-  :times [\t "Number of times (0-5)" { :arg "NUM" :default 5
-                                       :parser #(Integer/parseInt %)
-                                       :validator #(<= 0 % 5) }]
-  :verbose [\v "Verbosity level" { :default 0 :update-fn inc }]})
+   :times   (ap/int-param "NUM" "Number of times (0-5)"
+                :default 5    :validator #(<= 0 % 5))
+   :verbose (ap/counter-param "Verbosity Level" :short \v)
+   :help    (ap/flag-param "Get Help" :short \?)
+   })
 
 ...
 (let [options (ap/parse arg-spec args)] ...)
@@ -28,10 +28,8 @@ by going with this library.
 
 ## Tips
 
-- Use `nil` for the short option character if you don't want a short
-  version.  You always have to have a long version.
+- You always have to have a long name.  Any flag can have a short name also.
 - `parse` throws `IllegalArgumentException`s when it finds input it doesn't
   like.
 - Any args which don't look like switches are returned with key
   `:free-args` in the order they were found.
-
